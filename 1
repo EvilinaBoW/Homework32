@@ -1,0 +1,190 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace ConsoleApp17
+{
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            #region Задание 1: Создание нового потока
+            Console.WriteLine("Задание 1");
+            Thread thread1 = new Thread(new ThreadStart(PrintHello));
+            thread1.Start();
+            thread1.Join(); // Ждем завершения для порядка вывода
+            #endregion
+
+            #region Задание 2: Два потока с Join()
+            Console.WriteLine("\nЗадание 2");
+            Thread thread2a = new Thread(() => Console.WriteLine("Поток 2A выполняется"));
+            Thread thread2b = new Thread(() => Console.WriteLine("Поток 2B выполняется"));
+
+            thread2a.Start();
+            thread2a.Join(); // Ждем завершения первого
+
+            thread2b.Start();
+            thread2b.Join(); // Ждем завершения второго
+
+            Console.WriteLine("Оба потока завершены");
+            #endregion
+
+            #region Задание 3: ID текущего потока
+            Console.WriteLine("\nЗадание 3");
+            Console.WriteLine($"ID текущего потока: {Thread.CurrentThread.ManagedThreadId}");
+            #endregion
+
+            #region Задание 4: Параллельное выполнение трех операций
+            Console.WriteLine("\nЗадание 4");
+            Thread[] threads = new Thread[3];
+
+            for (int i = 0; i < 3; i++)
+            {
+                int index = i;
+                threads[i] = new Thread(() => DoWork(index, (index + 1) * 1000));
+                threads[i].Start();
+            }
+
+            // Ждем завершения всех потоков
+            foreach (Thread thread in threads)
+            {
+                thread.Join();
+            }
+            Console.WriteLine("Все три операции завершены");
+            #endregion
+
+            #region Задание 5: Передача параметра в поток
+            Console.WriteLine("\nЗадание 5 ");
+            Thread paramThread = new Thread(new ParameterizedThreadStart(PrintParameter));
+            paramThread.Start("Привет из потока с параметром!");
+            paramThread.Join();
+            #endregion
+
+            #region Задание 6: Приоритет потока
+            Console.WriteLine("\nЗадание 6");
+            Thread lowPriorityThread = new Thread(() => CountNumbers("Низкий приоритет"));
+            Thread highPriorityThread = new Thread(() => CountNumbers("Высокий приоритет"));
+
+            lowPriorityThread.Priority = ThreadPriority.Lowest;
+            highPriorityThread.Priority = ThreadPriority.Highest;
+
+            highPriorityThread.Start();
+            lowPriorityThread.Start();
+
+            Thread.Sleep(100); // Даем время на выполнение
+            highPriorityThread.Join();
+            lowPriorityThread.Join();
+            #endregion
+
+            #region Задание 7: Остановка потока с задержкой
+            Console.WriteLine("\nЗадание 7");
+            Thread sleepThread = new Thread(() =>
+            {
+                Console.WriteLine("Поток начал работу");
+                Thread.Sleep(1000); // Задержка 1 секунда
+                Console.WriteLine("Поток завершил работу после задержки");
+            });
+            sleepThread.Start();
+            sleepThread.Join();
+            #endregion
+
+            #region Задание 8: Фоновый поток
+            Console.WriteLine("\nЗадание 8");
+            Thread backgroundThread = new Thread(() =>
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    Console.WriteLine($"Фоновый поток работает: {i}");
+                    Thread.Sleep(500);
+                }
+            })
+            { IsBackground = true }; // Устанавливаем как фоновый
+
+            backgroundThread.Start();
+            Console.WriteLine("Основной поток продолжает работу");
+            Thread.Sleep(1000); // Даем время фоновому потоку поработать
+            Console.WriteLine("Основной поток завершается (фоновый поток может не успеть завершиться)");
+            #endregion
+
+            #region Задание 9: Имя текущего потока
+            Console.WriteLine("\nЗадание 9");
+            Thread.CurrentThread.Name = "Главный поток";
+            Console.WriteLine($"Имя текущего потока: {Thread.CurrentThread.Name ?? "Не установлено"}");
+            #endregion
+
+            #region Задание 10: Синхронизация вывода
+            Console.WriteLine("\n=== Задание 10 ===");
+            object lockObject = new object();
+            List<string> results = new List<string>();
+
+            Thread[] syncThreads = new Thread[4];
+
+            for (int i = 0; i < 4; i++)
+            {
+                int threadNumber = i;
+                syncThreads[i] = new Thread(() =>
+                {
+                    string result = $"Результат из потока {threadNumber}";
+
+                    // Синхронизируем доступ к общему ресурсу
+                    lock (lockObject)
+                    {
+                        results.Add(result);
+                        Console.WriteLine($"Поток {threadNumber} добавил результат: {result}");
+                    }
+                });
+            }
+
+            foreach (Thread thread in syncThreads)
+            {
+                thread.Start();
+            }
+
+            foreach (Thread thread in syncThreads)
+            {
+                thread.Join();
+            }
+
+            Console.WriteLine("Все результаты:");
+            foreach (string result in results)
+            {
+                Console.WriteLine($" - {result}");
+            }
+            #endregion
+
+            Console.WriteLine("\nВсе задания завершены!");
+        }
+
+        // Методы для заданий
+        static void PrintHello()
+        {
+            Console.WriteLine("Привет из потока");
+        }
+
+        static void DoWork(int taskNumber, int duration)
+        {
+            Console.WriteLine($"Задача {taskNumber} началась и займет {duration}мс");
+            Thread.Sleep(duration);
+            Console.WriteLine($"Задача {taskNumber} завершена");
+        }
+
+        static void PrintParameter(object parameter)
+        {
+            Console.WriteLine($"Получен параметр: {parameter}");
+        }
+
+        static void CountNumbers(string threadName)
+        {
+            Thread.CurrentThread.Name = threadName;
+            int count = 0;
+            for (int i = 0; i < 1000000; i++)
+            {
+                count++;
+            }
+            Console.WriteLine($"{threadName} завершил подсчет: {count}");
+        }
+    }
+}
