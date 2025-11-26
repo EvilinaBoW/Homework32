@@ -1,0 +1,314 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace ConsoleApp17
+{
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            // Категория 10: Thread-Safe Collections
+            #region Задание 83: ConcurrentDictionary вместо обычного Dictionary
+            Console.WriteLine("Задание 83: ConcurrentDictionary");
+            var safeDict = new ConcurrentDictionary<string, int>();
+            Parallel.For(0, 10, i =>
+            {
+                safeDict.TryAdd($"Key{i}", i * 10);
+                safeDict.AddOrUpdate($"Key{i}", 0, (k, v) => v + 1);
+            });
+            foreach (var kvp in safeDict)
+                Console.WriteLine($"{kvp.Key} = {kvp.Value}");
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 84: ConcurrentQueue
+            Console.WriteLine("Задание 84: ConcurrentQueue");
+            var queue = new ConcurrentQueue<int>();
+            Parallel.Invoke(
+                () => { for (int i = 0; i < 10; i++) queue.Enqueue(i); },
+                () => { for (int i = 100; i < 110; i++) queue.Enqueue(i); }
+            );
+
+            while (queue.TryDequeue(out int item))
+                Console.Write(item + " ");
+            Console.WriteLine("\n");
+            #endregion
+
+            #region Задание 85: ConcurrentBag — накопление результатов
+            Console.WriteLine("Задание 85: ConcurrentBag");
+            var bag = new ConcurrentBag<string>();
+            Parallel.For(0, 8, i =>
+            {
+                bag.Add($"Результат от потока {Thread.CurrentThread.ManagedThreadId}");
+            });
+            Console.WriteLine($"Элементов в Bag: {bag.Count}");
+            foreach (var s in bag) Console.WriteLine(s);
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 86–87: BlockingCollection + Producer-Consumer
+            Console.WriteLine("Задание 86–87: BlockingCollection (Producer-Consumer)");
+            var blockingCollection = new BlockingCollection<string>(boundedCapacity: 5);
+
+            var producer = Task.Run(() =>
+            {
+                for (int i = 1; i <= 15; i++)
+                {
+                    string item = $"Товар {i}";
+                    blockingCollection.Add(item);
+                    Console.WriteLine($"Произведено: {item}");
+                    Thread.Sleep(100);
+                }
+                blockingCollection.CompleteAdding();
+            });
+
+            var consumer1 = Task.Run(() =>
+            {
+                foreach (var item in blockingCollection.GetConsumingEnumerable())
+                {
+                    Console.WriteLine($"  Потребитель 1 взял: {item}");
+                    Thread.Sleep(200);
+                }
+            });
+
+            var consumer2 = Task.Run(() =>
+            {
+                foreach (var item in blockingCollection.GetConsumingEnumerable())
+                {
+                    Console.WriteLine($"    Потребитель 2 взял: {item}");
+                    Thread.Sleep(150);
+                }
+            });
+
+            Task.WaitAll(producer, consumer1, consumer2);
+            Console.WriteLine("Producer-Consumer завершён\n");
+            #endregion
+
+            #region Задание 88: ConcurrentStack
+            Console.WriteLine("Задание 88: ConcurrentStack");
+            var stack = new ConcurrentStack<int>();
+            Parallel.For(0, 10, i => stack.Push(i));
+            Parallel.For(0, 5, _ =>
+            {
+                if (stack.TryPop(out int val))
+                    Console.WriteLine($"Извлечено из стека: {val}");
+            });
+            Console.WriteLine($"Осталось в стеке: {stack.Count}\n");
+            #endregion
+
+            #region Задание 89: Сравнение производительности потокобезопасных коллекций
+            Console.WriteLine("Задание 89: Производительность коллекций");
+            var sw = Stopwatch.StartNew();
+
+            // ConcurrentDictionary
+            sw.Restart();
+            var cd = new ConcurrentDictionary<int, int>();
+            Parallel.For(0, 1_000_000, i => cd.TryAdd(i, i));
+            Console.WriteLine($"ConcurrentDictionary: {sw.ElapsedMilliseconds} мс");
+
+            // ConcurrentQueue
+            sw.Restart();
+            var cq = new ConcurrentQueue<int>();
+            Parallel.For(0, 1_000_000, i => cq.Enqueue(i));
+            Console.WriteLine($"ConcurrentQueue:       {sw.ElapsedMilliseconds} мс");
+
+            // ConcurrentBag
+            sw.Restart();
+            var cb = new ConcurrentBag<int>();
+            Parallel.For(0, 1_000_000, i => cb.Add(i));
+            Console.WriteLine($"ConcurrentBag:         {sw.ElapsedMilliseconds} мс\n");
+            #endregion
+
+            #region Задание 90: TryAdd / TryRemove / GetOrAdd
+            Console.WriteLine("Задание 90: TryAdd, TryRemove, GetOrAdd");
+            var dict = new ConcurrentDictionary<int, string>();
+            dict.TryAdd(1, "Один");
+            dict.AddOrUpdate(1, "Новое", (k, v) => v + "!");
+            if (dict.TryRemove(1, out string removed))
+                Console.WriteLine($"Удалено: {removed}");
+            Console.WriteLine($"GetOrAdd(42): {dict.GetOrAdd(42, k => "Сорок два")}\n");
+            #endregion
+
+            // Категория 11: Interlocked Operations 
+            #region Задание 91: Interlocked.Increment
+            Console.WriteLine("Задание 91: Interlocked.Increment");
+            long counter = 0;
+            Parallel.For(0, 10, _ => { for (int i = 0; i < 100_000; i++) Interlocked.Increment(ref counter); });
+            Console.WriteLine($"Финальное значение счётчика: {counter}\n");
+            #endregion
+
+            #region Задание 92: Interlocked.CompareExchange
+            Console.WriteLine("Задание 92: CompareExchange (паттерн \"один раз\")");
+            int sharedValue = 0;
+            int target = 1;
+
+            Parallel.For(0, 8, _ =>
+            {
+                int current = Interlocked.CompareExchange(ref sharedValue, target, 0);
+                if (current == 0)
+                    Console.WriteLine("Я первый установил значение!");
+                else
+                    Console.WriteLine($"Уже установлено: {current}");
+            });
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 93: Interlocked vs lock
+            Console.WriteLine("Задание 93: Interlocked vs lock (производительность)");
+            long valueLock = 0;
+            object lockObj = new object();
+
+            sw.Restart();
+            Parallel.For(0, 10, _ => { for (int i = 0; i < 1_000_000; i++) { lock (lockObj) valueLock++; } });
+            Console.WriteLine($"lock:     {sw.ElapsedMilliseconds} мс");
+
+            long valueInterlocked = 0;
+            sw.Restart();
+            Parallel.For(0, 10, _ => { for (int i = 0; i < 1_000_000; i++) Interlocked.Increment(ref valueInterlocked); });
+            Console.WriteLine($"Interlocked: {sw.ElapsedMilliseconds} мс\n");
+            #endregion
+
+            #region Задание 94: Простой SpinLock через Interlocked
+            Console.WriteLine("Задание 94: SpinLock на Interlocked");
+            var spinLock = new SimpleSpinLock();
+            int protectedValue = 0;
+
+            Parallel.For(0, 8, _ =>
+            {
+                spinLock.Enter();
+                try
+                {
+                    protectedValue++;
+                    Console.WriteLine($"Поток {Thread.CurrentThread.ManagedThreadId} в критической секции");
+                }
+                finally
+                {
+                    spinLock.Exit();
+                }
+            });
+            Console.WriteLine($"Финальное значение: {protectedValue}\n");
+            #endregion
+
+            #region Задание 95–96: Interlocked.Read и Exchange
+            Console.WriteLine("Задание 95–96: Interlocked.Read и Exchange");
+            long bigValue = 123456789012345;
+            long read = Interlocked.Read(ref bigValue);
+            Console.WriteLine($"Прочитано 64-битное значение: {read}");
+
+            int oldValue = Interlocked.Exchange(ref protectedValue, 999);
+            Console.WriteLine($"Старое значение: {oldValue}, новое: {protectedValue}\n");
+            #endregion
+
+            // Категория 12: EventWaitHandle
+            #region Задание 97: AutoResetEvent
+            Console.WriteLine("Задание 97: AutoResetEvent");
+            var autoReset = new AutoResetEvent(false);
+
+            Thread worker = new Thread(() =>
+            {
+                Console.WriteLine("Рабочий ждёт сигнала...");
+                autoReset.WaitOne();
+                Console.WriteLine("Сигнал получен — работаем!");
+            });
+            worker.Start();
+
+            Thread.Sleep(1000);
+            autoReset.Set(); // Разблокируем один поток
+            worker.Join();
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 98: ManualResetEvent
+            Console.WriteLine("Задание 98: ManualResetEvent (групповое разблокирование)");
+            var manualReset = new ManualResetEvent(false);
+
+            for (int i = 0; i < 5; i++)
+            {
+                int id = i;
+                new Thread(() =>
+                {
+                    Console.WriteLine($"Поток {id} ждёт...");
+                    manualReset.WaitOne();
+                    Console.WriteLine($"Поток {id} разблокирован!");
+                }).Start();
+            }
+
+            Thread.Sleep(1500);
+            manualReset.Set(); // Разблокируем ВСЕ потоки сразу
+            Thread.Sleep(500);
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 99: WaitHandle.WaitAll
+            Console.WriteLine("Задание 99: WaitHandle.WaitAll");
+            var events = new[]
+            {
+                new ManualResetEvent(false),
+                new ManualResetEvent(false),
+                new ManualResetEvent(false)
+            };
+
+            for (int i = 0; i < events.Length; i++)
+            {
+                int idx = i;
+                ThreadPool.QueueUserWorkItem(_ =>
+                {
+                    Thread.Sleep(500 + idx * 200);
+                    Console.WriteLine($"Событие {idx} установлено");
+                    events[idx].Set();
+                });
+            }
+
+            Console.WriteLine("Ждём все события...");
+            WaitHandle.WaitAll(events);
+            Console.WriteLine("Все события сработали!\n");
+            #endregion
+
+            #region Задание 100: Producer-Consumer с EventWaitHandle
+            Console.WriteLine("Задание 100: Producer-Consumer с AutoResetEvent");
+            var buffer = new ConcurrentQueue<int>();
+            var itemAvailable = new AutoResetEvent(false);
+            var allDone = new ManualResetEvent(false);
+            int producedCount = 0;
+
+            Thread producer100 = new Thread(() =>
+            {
+                for (int i = 1; i <= 10; i++)
+                {
+                    buffer.Enqueue(i);
+                    Interlocked.Increment(ref producedCount);
+                    Console.WriteLine($"Произведено: {i}");
+                    itemAvailable.Set();
+                    Thread.Sleep(100);
+                }
+                allDone.Set();
+            });
+            producer100.Start();
+
+            Thread consumer100 = new Thread(() =>
+            {
+                while (true)
+                {
+                    // Ждём либо новый элемент, либо сигнал завершения
+                    int signaled = WaitHandle.WaitAny(new WaitHandle[] { itemAvailable, allDone });
+                    if (signaled == 1) break; // allDone сработал
+
+                    if (buffer.TryDequeue(out int item))
+                        Console.WriteLine($"  Потреблено: {item}");
+                }
+            });
+            consumer100.Start();
+
+            producer100.Join();
+            consumer100.Join();
+            Console.WriteLine("Producer-Consumer на EventWaitHandle завершён!\n");
+            #endregion
+        }
+    }
+}
