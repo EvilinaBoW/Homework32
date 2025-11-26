@@ -1,0 +1,339 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace ConsoleApp17
+{
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            // Категория 1: Thread Basics
+            #region Задание 1: Создайте новый поток, который выведет 'Привет из потока'
+            Console.WriteLine("Задание 1: Привет из потока");
+            Thread thread1 = new Thread(() => Console.WriteLine("Привет из потока"));
+            thread1.Start();
+            thread1.Join();
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 2: Запустите два потока последовательно и дождитесь завершения обоих
+            Console.WriteLine("Задание 2: Два потока с Join()");
+            Thread t2a = new Thread(() => { Thread.Sleep(500); Console.WriteLine("Поток A завершён"); });
+            Thread t2b = new Thread(() => { Thread.Sleep(300); Console.WriteLine("Поток B завершён"); });
+
+            t2a.Start();
+            t2b.Start();
+
+            t2a.Join();
+            t2b.Join();
+            Console.WriteLine("Оба потока завершены\n");
+            #endregion
+
+            #region Задание 3: Получите ID текущего потока
+            Console.WriteLine($"Задание 3: ID текущего потока = {Thread.CurrentThread.ManagedThreadId}\n");
+            #endregion
+
+            #region Задание 4: Параллельное выполнение трёх операций с разным временем
+            Console.WriteLine("Задание 4: Три параллельные операции");
+            Thread t4a = new Thread(() => { Thread.Sleep(1000); Console.WriteLine("Операция 1 (1 сек)"); });
+            Thread t4b = new Thread(() => { Thread.Sleep(2000); Console.WriteLine("Операция 2 (2 сек)"); });
+            Thread t4c = new Thread(() => { Thread.Sleep(500); Console.WriteLine("Операция 3 (0.5 сек)"); });
+
+            t4a.Start(); t4b.Start(); t4c.Start();
+            t4a.Join(); t4b.Join(); t4c.Join();
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 5: Передача параметра через ParameterizedThreadStart
+            Console.WriteLine("Задание 5: ParameterizedThreadStart");
+            Thread t5 = new Thread(new ParameterizedThreadStart(obj =>
+            {
+                Console.WriteLine($"Получен параметр: {obj}");
+            }));
+            t5.Start("Привет из параметра!");
+            t5.Join();
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 6: Установка приоритета потока
+            Console.WriteLine("Задание 6: Влияние приоритета (наблюдаем на слабой нагрузке)");
+            Thread high = new Thread(() => { for (int i = 0; i < 50; i++) Console.Write("H"); }) { Priority = ThreadPriority.Highest };
+            Thread low = new Thread(() => { for (int i = 0; i < 50; i++) Console.Write("L"); }) { Priority = ThreadPriority.Lowest };
+
+            high.Start();
+            low.Start();
+            high.Join();
+            low.Join();
+            Console.WriteLine("\n");
+            #endregion
+
+            #region Задание 7: Thread.Sleep(1000)
+            Console.WriteLine("Задание 7: Задержка в потоке");
+            Thread t7 = new Thread(() =>
+            {
+                Console.WriteLine("Спим 1 секунду...");
+                Thread.Sleep(1000);
+                Console.WriteLine("Проснулись!");
+            });
+            t7.Start();
+            t7.Join();
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 8: Фоновый поток (IsBackground = true)
+            Console.WriteLine("Задание 8: Фоновый поток");
+            Thread background = new Thread(() =>
+            {
+                Thread.Sleep(2000);
+                Console.WriteLine("Фоновый поток выполнился (если бы был foreground — программа ждала бы)");
+            })
+            { IsBackground = true };
+
+            background.Start();
+            // Не ждём — он фоновый
+            Thread.Sleep(500);
+            Console.WriteLine("Основной поток продолжает (фоновый может не успеть)\n");
+            #endregion
+
+            #region Задание 9: Имя текущего потока
+            Console.WriteLine("Задание 9: Имена потоков");
+            Thread.CurrentThread.Name = "MainThread";
+            Thread t9 = new Thread(() =>
+            {
+                Thread.CurrentThread.Name = "WorkerThread";
+                Console.WriteLine($"Имя потока: {Thread.CurrentThread.Name}");
+            });
+            t9.Start();
+            t9.Join();
+            Console.WriteLine($"Имя основного потока: {Thread.CurrentThread.Name}\n");
+            #endregion
+
+            #region Задание 10: Синхронизация вывода нескольких потоков
+            Console.WriteLine("Задание 10: Синхронизированный вывод");
+            object lockObj = new object();
+            Thread[] threads10 = new Thread[5];
+            for (int i = 0; i < 5; i++)
+            {
+                int id = i;
+                threads10[i] = new Thread(() =>
+                {
+                    lock (lockObj)
+                    {
+                        Console.WriteLine($"Поток {id} начал вывод");
+                        Thread.Sleep(100);
+                        Console.WriteLine($"Поток {id} закончил вывод");
+                    }
+                });
+                threads10[i].Start();
+            }
+            foreach (var t in threads10) t.Join();
+            Console.WriteLine();
+            #endregion
+
+            // Категория 2: Task Basics
+            #region Задание 11: Task.Run()
+            Console.WriteLine("Задание 11: Task.Run");
+            Task.Run(() => Console.WriteLine("Выполняется внутри Task.Run"));
+            Thread.Sleep(300); // чтобы увидеть вывод
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 12: Task.Wait()
+            Console.WriteLine("Задание 12: Task.Wait");
+            Task t12 = Task.Run(() =>
+            {
+                Thread.Sleep(800);
+                Console.WriteLine("Task 12 завершён");
+            });
+            t12.Wait();
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 13: Task<T> с возвратом результата
+            Console.WriteLine("Задание 13: Task<int>");
+            Task<int> t13 = Task.Run(() =>
+            {
+                Thread.Sleep(500);
+                return 42;
+            });
+            Console.WriteLine($"Результат Task<int>: {t13.Result}\n");
+            #endregion
+
+            #region Задание 14: Task.WaitAll()
+            Console.WriteLine("Задание 14: Task.WaitAll");
+            Task[] tasks14 = new[]
+            {
+                Task.Run(() => { Thread.Sleep(1000); Console.WriteLine("Task 14-A"); }),
+                Task.Run(() => { Thread.Sleep(600);  Console.WriteLine("Task 14-B"); }),
+                Task.Run(() => { Thread.Sleep(800);  Console.WriteLine("Task 14-C"); })
+            };
+            Task.WaitAll(tasks14);
+            Console.WriteLine("Все задачи WaitAll завершены\n");
+            #endregion
+
+            #region Задание 15: Task.WhenAll()
+            Console.WriteLine("Задание 15: Task.WhenAll (асинхронно)");
+            Task whenAll = Task.WhenAll(
+                Task.Delay(1000).ContinueWith(_ => Console.WriteLine("WhenAll 1")),
+                Task.Delay(500).ContinueWith(_ => Console.WriteLine("WhenAll 2"))
+            );
+            whenAll.Wait();
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 16: ContinueWith
+            Console.WriteLine("Задание 16: ContinueWith");
+            Task.Run(() => Console.WriteLine("Шаг 1"))
+                .ContinueWith(prev => Console.WriteLine("Шаг 2 (после шага 1)"))
+                .ContinueWith(prev => Console.WriteLine("Шаг 3 (после шага 2)"))
+                .Wait();
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 17: Task.WaitAny
+            Console.WriteLine("Задание 17: Task.WaitAny");
+            Task[] tasks17 = {
+                Task.Delay(2000).ContinueWith(_ => Console.WriteLine("Медленный")),
+                Task.Delay(500).ContinueWith(_ => Console.WriteLine("Быстрый"))
+            };
+            int index = Task.WaitAny(tasks17);
+            Console.WriteLine($"Первым завершился задача №{index}\n");
+            #endregion
+
+            #region Задание 18: Task.WhenAny (асинхронное ожидание первой завершённой задачи)
+            Console.WriteLine("Задание 18: Task.WhenAny");
+
+            var longTask = Task.Delay(1500).ContinueWith(_ => "Длинная задача");
+            var shortTask = Task.Delay(400).ContinueWith(_ => "Короткая задача");
+
+            Task<string> firstFinished = await Task.WhenAny(longTask, shortTask);
+            Console.WriteLine($"Первой завершилась: {firstFinished.Result}\n");
+            #endregion
+
+            #region Задание 19: Task с исключением
+            Console.WriteLine("Задание 19: Обработка исключения в Task");
+            Task t19 = Task.Run(() =>
+            {
+                throw new InvalidOperationException("Ошибка в задаче!");
+            });
+
+            try { t19.Wait(); }
+            catch (AggregateException ae)
+            {
+                foreach (var ex in ae.Flatten().InnerExceptions)
+                    Console.WriteLine($"Поймано: {ex.Message}");
+            }
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 20: TaskScheduler (пример с FromCurrentSynchronizationContext)
+            Console.WriteLine("Задание 20: TaskScheduler (демонстрация контекста)");
+            var ui = TaskScheduler.FromCurrentSynchronizationContext();
+            Task.Run(() => Console.WriteLine("Выполняется в пуле"))
+                .ContinueWith(t => Console.WriteLine($"Вернулись в основной поток? Scheduler: {TaskScheduler.Current == ui}"),
+                              TaskScheduler.FromCurrentSynchronizationContext());
+            Thread.Sleep(500);
+            Console.WriteLine();
+            #endregion
+
+            // Категория 3: Async/Await
+            #region Задание 21-23, 25-27: Полный async/await пример
+            Console.WriteLine("Задания 21-23,25-27: async/await примеры");
+            RunFullAsyncDemoAsync().GetAwaiter().GetResult();
+            #endregion
+
+            #region Задание 24: Task.Delay
+            Console.WriteLine("Задание 24: Task.Delay");
+            Task.Run(async () =>
+            {
+                Console.WriteLine("Начало задержки...");
+                await Task.Delay(1000);
+                Console.WriteLine("Задержка завершена асинхронно");
+            }).Wait();
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 26: ConfigureAwait(false)
+            Console.WriteLine("Задание 26: ConfigureAwait(false)");
+            Task.Run(async () =>
+            {
+                await Task.Delay(100).ConfigureAwait(false);
+                Console.WriteLine("Выполняется без захвата контекста");
+            }).Wait();
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 28: async void (только для обработчиков)
+            Console.WriteLine("Задание 28: async void — пример (не рекомендуется кроме событий)");
+            // Пример имитации обработчика события
+            SimulateButtonClick();
+            Thread.Sleep(500);
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 29: Преобразование синхронного метода в асинхронный
+            Console.WriteLine("Задание 29: Синхронный → асинхронный");
+            Console.WriteLine($"Сумма асинхронно: {SlowSumAsync(6, 7).Result}\n");
+            #endregion
+
+            #region Задание 30: Task.FromResult
+            Console.WriteLine("Задание 30: Task.FromResult");
+            Task<string> cached = Task.FromResult("Данные из кеша");
+            Console.WriteLine($"Результат из FromResult: {cached.Result}\n");
+            #endregion
+
+            Console.WriteLine("=== Все 30 заданий успешно выполнены ===");
+            Console.ReadLine();
+        }
+
+        // Вспомогательные async методы для заданий 21–29
+        static async Task RunFullAsyncDemoAsync()
+        {
+            Console.WriteLine("Запуск асинхронной цепочки...");
+            int result = await ComputeSomethingAsync();
+            Console.WriteLine($"Результат вычисления: {result}");
+
+            try
+            {
+                await MethodThatThrowsAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Обработано исключение: {ex.Message}");
+            }
+        }
+
+        static async Task<int> ComputeSomethingAsync()
+        {
+            await Task.Delay(800).ConfigureAwait(false);
+            return 12345;
+        }
+
+        static async Task MethodThatThrowsAsync()
+        {
+            await Task.Delay(300);
+            throw new InvalidOperationException("Что-то пошло не так в async методе");
+        }
+
+        static void SimulateButtonClick()
+        {
+            ButtonClickHandler(); // async void
+        }
+
+        static async void ButtonClickHandler()
+        {
+            await Task.Delay(400);
+            Console.WriteLine("Обработчик события (async void) выполнился");
+        }
+
+        static async Task<int> SlowSumAsync(int a, int b)
+        {
+            await Task.Delay(600); // имитация долгой операции (например, I/O)
+            return a + b;
+        }
+    }
+}
