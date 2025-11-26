@@ -1,0 +1,364 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace ConsoleApp17
+{
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            // Категория 7: ThreadPool 
+            #region Задание 59: ThreadPool.QueueUserWorkItem
+            Console.WriteLine("Задание 59: ThreadPool.QueueUserWorkItem");
+            ThreadPool.QueueUserWorkItem(state =>
+            {
+                Console.WriteLine($"Выполняется в ThreadPool, поток ID: {Thread.CurrentThread.ManagedThreadId}");
+            });
+            Thread.Sleep(300);
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 60: Информация о ThreadPool
+            Console.WriteLine("Задание 60: Размер ThreadPool");
+            ThreadPool.GetMaxThreads(out int maxWorker, out int maxIO);
+            ThreadPool.GetAvailableThreads(out int availWorker, out int availIO);
+            ThreadPool.GetMinThreads(out int minWorker, out int minIO);
+
+            Console.WriteLine($"Макс. рабочие: {maxWorker}, Макс. I/O: {maxIO}");
+            Console.WriteLine($"Мин. рабочие: {minWorker}, Мин. I/O: {minIO}");
+            Console.WriteLine($"Доступно рабочие: {availWorker}, Доступно I/O: {availIO}\n");
+            #endregion
+
+            #region Задание 61: Установка мин/макс потоков
+            Console.WriteLine("Задание 61: SetMinThreads / SetMaxThreads");
+            ThreadPool.SetMinThreads(8, 4);
+            ThreadPool.SetMaxThreads(32, 16);
+
+            ThreadPool.GetMinThreads(out int newMinW, out int newMinIO);
+            ThreadPool.GetMaxThreads(out int newMaxW, out int newMaxIO);
+            Console.WriteLine($"Новое мин: {newMinW}/{newMinIO}, Новое макс: {newMaxW}/{newMaxIO}\n");
+            #endregion
+
+            #region Задание 62: RegisterWaitForSingleObject
+            Console.WriteLine("Задание 62: RegisteredWaitHandle (ожидание события)");
+            var autoEvent = new AutoResetEvent(false);
+
+            RegisteredWaitHandle handle = ThreadPool.RegisterWaitForSingleObject(
+                autoEvent,
+                (state, timedOut) =>
+                {
+                    if (!timedOut)
+                        Console.WriteLine("Событие сработало!");
+                    else
+                        Console.WriteLine("Таймаут ожидания события");
+                },
+                null,
+                TimeSpan.FromSeconds(2),
+                true);
+
+            Thread.Sleep(1000);
+            autoEvent.Set(); // Сигнализируем
+            Thread.Sleep(3000);
+            handle.Unregister(autoEvent);
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 63: Сравнение ThreadPool vs Task
+            Console.WriteLine("Задание 63: ThreadPool.QueueUserWorkItem vs Task.Run");
+            var sw = Stopwatch.StartNew();
+
+            sw.Restart();
+            for (int i = 0; i < 100; i++)
+                ThreadPool.QueueUserWorkItem(_ => Thread.SpinWait(1_000_000));
+            Thread.Sleep(100);
+            Console.WriteLine($"ThreadPool.QueueUserWorkItem: ~{sw.ElapsedMilliseconds} мс (примерно)");
+
+            sw.Restart();
+            Task.WaitAll(Enumerable.Range(0, 100).Select(_ => Task.Run(() => Thread.SpinWait(1_000_000))).ToArray());
+            Console.WriteLine($"Task.Run: {sw.ElapsedMilliseconds} мс\n");
+            #endregion
+
+            #region Задание 64: GetAvailableThreads
+            Console.WriteLine("Задание 64: Мониторинг доступных потоков");
+            for (int i = 0; i < 50; i++)
+            {
+                ThreadPool.QueueUserWorkItem(_ => Thread.Sleep(100));
+            }
+            ThreadPool.GetAvailableThreads(out int w, out int io);
+            Console.WriteLine($"После постановки 50 задач — доступно рабочих потоков: {w}\n");
+            Thread.Sleep(500);
+            #endregion
+
+            #region Задание 65: Собственный пул потоков (упрощённый)
+            Console.WriteLine("Задание 65: Собственный ThreadPool (очередь задач)");
+            var customPool = new SimpleThreadPool(4);
+            for (int i = 0; i < 10; i++)
+            {
+                int id = i;
+                customPool.QueueTask(() =>
+                {
+                    Console.WriteLine($"Пользовательская задача {id} в потоке {Thread.CurrentThread.ManagedThreadId}");
+                    Thread.Sleep(200);
+                });
+            }
+            Thread.Sleep(2000);
+            customPool.Shutdown();
+            Console.WriteLine();
+            #endregion
+
+            // Категория 8: Parallel 
+            #region Задание 67: Parallel.For
+            Console.WriteLine("Задание 67: Parallel.For");
+            Parallel.For(0, 10, i =>
+            {
+                Console.WriteLine($"Parallel.For: итерация {i}, поток {Thread.CurrentThread.ManagedThreadId}");
+                Thread.Sleep(100);
+            });
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 68: Parallel.ForEach
+            Console.WriteLine("Задание 68: Parallel.ForEach");
+            var numbers = Enumerable.Range(1, 12);
+            Parallel.ForEach(numbers, num =>
+            {
+                Console.WriteLine($"Parallel.ForEach: обработка {num}");
+                Thread.Sleep(150);
+            });
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 69: Parallel.Invoke
+            Console.WriteLine("Задание 69: Parallel.Invoke");
+            Parallel.Invoke(
+                () => { Thread.Sleep(300); Console.WriteLine("Действие 1"); },
+                () => { Thread.Sleep(200); Console.WriteLine("Действие 2"); },
+                () => { Thread.Sleep(100); Console.WriteLine("Действие 3"); }
+            );
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 70: ParallelOptions.MaxDegreeOfParallelism
+            Console.WriteLine("Задание 70: ParallelOptions с MaxDegreeOfParallelism = 2");
+            var options = new ParallelOptions { MaxDegreeOfParallelism = 2 };
+            Parallel.For(0, 8, options, i =>
+            {
+                Console.WriteLine($"Ограничено 2 потоками: {i} → поток {Thread.CurrentThread.ManagedThreadId}");
+                Thread.Sleep(200);
+            });
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 71: CancellationToken в Parallel.For
+            Console.WriteLine("Задание 71: Отмена Parallel.For");
+            var cts = new CancellationTokenSource(500);
+            var optCancel = new ParallelOptions { CancellationToken = cts.Token };
+
+            try
+            {
+                Parallel.For(0, 1000, optCancel, i =>
+                {
+                    Thread.Sleep(100);
+                    Console.WriteLine($"Итерация {i}");
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine("Parallel.For успешно отменён!\n");
+            }
+            #endregion
+
+            #region Задание 72: Partitioner для оптимизации
+            Console.WriteLine("Задание 72: Partitioner (динамическое разбиение)");
+            var largeList = Enumerable.Range(0, 1000).ToList();
+            Parallel.ForEach(Partitioner.Create(largeList, true), item =>
+            {
+                Thread.SpinWait(500_000);
+            });
+            Console.WriteLine("Partitioner оптимизировал нагрузку\n");
+            #endregion
+
+            #region Задание 74: Divide-and-Conquer с Parallel.Invoke
+            Console.WriteLine("Задание 74: Divide-and-Conquer (рекурсивный параллельный поиск максимума)");
+            int[] data = Enumerable.Range(1, 1_000_000).ToArray();
+            int max = FindMaxParallel(data, 0, data.Length - 1);
+            Console.WriteLine($"Максимум в массиве: {max}\n");
+            #endregion
+
+            #region Задание 75: Сравнение производительности
+            Console.WriteLine("Задание 75: Parallel.For vs обычный for");
+            int[] arr = Enumerable.Range(0, 10_000_000).ToArray();
+
+            sw.Restart();
+            long sum1 = 0;
+            for (int i = 0; i < arr.Length; i++) sum1 += arr[i];
+            sw.Stop();
+            Console.WriteLine($"Обычный for: {sw.ElapsedMilliseconds} мс");
+
+            sw.Restart();
+            long sum2 = 0;
+            Parallel.For(0, arr.Length, () => 0L, (i, state, local) => local + arr[i], local => Interlocked.Add(ref sum2, local));
+            sw.Stop();
+            Console.WriteLine($"Parallel.For: {sw.ElapsedMilliseconds} мс\n");
+            #endregion
+
+            // Категория 9: PLINQ 
+            #region Задание 77: AsParallel()
+            Console.WriteLine("Задание 77: PLINQ AsParallel()");
+            var source = Enumerable.Range(1, 20);
+            var result = source
+                .AsParallel()
+                .Where(x => { Thread.Sleep(50); return x % 3 == 0; })
+                .Select(x => x * x);
+
+            foreach (var r in result) Console.Write(r + " ");
+            Console.WriteLine("\n");
+            #endregion
+
+            #region Задание 78: WithDegreeOfParallelism
+            Console.WriteLine("Задание 78: WithDegreeOfParallelism(2)");
+            var limited = Enumerable.Range(1, 15)
+                .AsParallel()
+                .WithDegreeOfParallelism(2)
+                .Select(x =>
+                {
+                    Console.WriteLine($"Обрабатывается {x} в потоке {Thread.CurrentThread.ManagedThreadId}");
+                    Thread.Sleep(200);
+                    return x * 10;
+                });
+
+            limited.ForAll(Console.WriteLine);
+            Console.WriteLine();
+            #endregion
+
+            #region Задание 79: WithCancellation
+            Console.WriteLine("Задание 79: PLINQ WithCancellation");
+            var ctsPlinq = new CancellationTokenSource(300);
+            try
+            {
+                var query = Enumerable.Range(1, 1000)
+                    .AsParallel()
+                    .WithCancellation(ctsPlinq.Token)
+                    .Select(x =>
+                    {
+                        Thread.Sleep(100);
+                        return x * x;
+                    });
+
+                query.ForAll(x => Console.WriteLine(x));
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine("PLINQ запрос отменён!\n");
+            }
+            #endregion
+
+            #region Задание 81: Сравнение PLINQ vs LINQ
+            Console.WriteLine("Задание 81: PLINQ vs обычный LINQ");
+            var dataPlinq = Enumerable.Range(1, 5_000_000);
+
+            sw.Restart();
+            var linqResult = dataPlinq.Where(x => x % 100 == 0).Sum();
+            sw.Stop();
+            Console.WriteLine($"Обычный LINQ: {sw.ElapsedMilliseconds} мс");
+
+            sw.Restart();
+            var plinqResult = dataPlinq.AsParallel().Where(x => x % 100 == 0).Sum();
+            sw.Stop();
+            Console.WriteLine($"PLINQ: {sw.ElapsedMilliseconds} мс\n");
+            #endregion
+
+            #region Задание 82: ToList() для материализации
+            Console.WriteLine("Задание 82: Материализация с ToList()");
+            var materialized = Enumerable.Range(1, 100)
+                .AsParallel()
+                .Select(x => { Thread.Sleep(10); return x * x; })
+                .ToList(); // ← материализация
+
+            Console.WriteLine($"Материализовано {materialized.Count} элементов\n");
+            #endregion
+
+            Console.WriteLine("=== Все задания 59–82 выполнены успешно! ===");
+            Console.ReadLine();
+        }
+
+        // Вспомогательные методы и классы
+
+        static int FindMaxParallel(int[] arr, int left, int right)
+        {
+            if (right - left <= 10000)
+            {
+                int max = arr[left];
+                for (int i = left + 1; i <= right; i++)
+                    if (arr[i] > max) max = arr[i];
+                return max;
+            }
+
+            int mid = (left + right) / 2;
+            int leftMax = 0, rightMax = 0;
+
+            Parallel.Invoke(
+                () => leftMax = FindMaxParallel(arr, left, mid),
+                () => rightMax = FindMaxParallel(arr, mid + 1, right)
+            );
+
+            return Math.Max(leftMax, rightMax);
+        }
+
+        class SimpleThreadPool
+        {
+            private readonly Queue<Action> _tasks = new();
+            private readonly Thread[] _workers;
+            private volatile bool _stop = false;
+
+            public SimpleThreadPool(int count)
+            {
+                _workers = new Thread[count];
+                for (int i = 0; i < count; i++)
+                {
+                    _workers[i] = new Thread(WorkerLoop) { IsBackground = true };
+                    _workers[i].Start();
+                }
+            }
+
+            public void QueueTask(Action task)
+            {
+                lock (_tasks)
+                {
+                    _tasks.Enqueue(task);
+                    Monitor.Pulse(_tasks);
+                }
+            }
+
+            public void Shutdown()
+            {
+                _stop = true;
+                lock (_tasks) Monitor.PulseAll(_tasks);
+                foreach (var w in _workers) w.Join();
+            }
+
+            private void WorkerLoop()
+            {
+                while (true)
+                {
+                    Action task;
+                    lock (_tasks)
+                    {
+                        while (_tasks.Count == 0 && !_stop)
+                            Monitor.Wait(_tasks);
+                        if (_stop) return;
+                        task = _tasks.Dequeue();
+                    }
+                    try { task(); }
+                    catch { }
+                }
+            }
+        }
+    }
+}
